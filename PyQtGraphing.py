@@ -14,8 +14,8 @@ import numpy as np
 
 # Import Qt stuff.
 
-from PyQt5.QtCore import pyqtSignal, QThread
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout
+from PySide6.QtCore import Signal, QThread
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout
 
 # Import Matplotlib stuff.
 
@@ -43,7 +43,7 @@ class MeasurementThread(QThread):
     the interaction would take a noticable time, this could be important.
     """
 
-    measurement = pyqtSignal(float, float)
+    measurement = Signal(float, float)
 
     def __init__(self, measurement_interval, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -78,7 +78,7 @@ class SlidingWindow:
         self.n += 1
 
     def window(self):
-        """Get a window of the most recent 'window_size' samples (or less if not available.)"""
+        """Get a window of the most recent 'window_size' samples (or less if not available)."""
         return self.data[max(0, self.n - self.window_size):self.n]
 
 
@@ -95,7 +95,9 @@ class MatplotlibGraphWidget(QWidget):
         self.xy = SlidingWindow(sliding_window_size, xy_dtype)
 
         fig = Figure()
-        self.ax = fig.add_subplot(111)
+        self.ax = fig.subplots()
+        self.ax.grid()
+        self.line2d, = self.ax.plot([], [], "rx")
         self.canvas = FigureCanvas(fig)
 
         layout = QVBoxLayout()
@@ -122,10 +124,13 @@ class MatplotlibGraphWidget(QWidget):
 
         t_now = time.time()
 
-        self.ax.clear()
-        self.ax.plot(w["x"] - t_now, w["y"], 'rx')
+        # Set the line2d (plotline) data.
+        self.line2d.set_data(w["x"] - t_now, w["y"])
 
-        self.canvas.draw()
+        # Magic to do rescale & redraw.
+        self.ax.relim()
+        self.ax.autoscale_view()
+        self.canvas.draw_idle()
 
         t2 = time.monotonic()
 
@@ -148,6 +153,7 @@ class PyQtGraphWidget(QWidget):
 
         plotWidget = pg.PlotWidget()
         self.plot = plotWidget.plot(symbol='x', symbolPen='r', pen=None)
+        plotWidget.showGrid(x=1, y=1, alpha = 0.1)
 
         layout = QVBoxLayout()
         layout.addWidget(plotWidget)
@@ -211,10 +217,10 @@ app = None
 def main():
 
     global app
-    measurement_interval = 0.100 # [s] (acquire data at approx. 5 Hz)
+    measurement_interval = 0.100 # [s] (acquire data at approx. 10 Hz)
     sliding_window_size = 100 # [samples]
     app = Application(measurement_interval, sliding_window_size, sys.argv)
-    app.exec_()
+    app.exec()
 
 if __name__ == "__main__":
     main()
